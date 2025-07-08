@@ -1,13 +1,12 @@
-const express = require('express');
-const router = express.Router();
-const User = require('../modals/user');
-// Create a user
-const userController = require('../controller/userController');
-const { LoginValidation, SignUpValidation} = require('../middleware/middleware');
+const express = require("express");
+const {signup,login,forgotPassword,verifyOtp,resetPassword} = require("../controller/userController");
 
-router.post('/signup',SignUpValidation, userController.signup);
-router.post('/login',LoginValidation, userController.login);
-router.post("/forgot-password", userController.forgotPassword);
-router.post("/reset-password", userController.resetPassword);
+const router = express.Router();
+
+router.post("/signup", signup);
+router.post("/login", login);
+router.post("/forgot-password", forgotPassword);
+router.post("/verify-otp", verifyOtp); 
+router.post("/reset-password", resetPassword);
 
 module.exports = router;

@@ -1,19 +1,18 @@
 const User = require("../modals/user");
-const crypto = require("crypto");       
+const crypto = require("crypto");
 const nodemailer = require("nodemailer");
-require('dotenv').config();
+require("dotenv").config();
+
 async function signup(req, res) {
   const { username, email, password } = req.body;
 
   try {
-    // Check if username already exists
-    const existingUser = await User.findOne({ username: username });
+    const existingUser = await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).send("User already exists!");
     }
 
-    // Create new user in MongoDB
     const newUser = await User.create({
       username,
       email,
@@ -44,106 +43,84 @@ async function login(req, res) {
   } catch (error) {
     res.status(500).json({
       message: "Login error",
-      error: error.message, // this gives a readable string in frontend
+      error: error.message,
     });
   }
 }
 
-// async function forgotPassword(req, res) {
-//   const { email } = req.body;
-
-//   try {
-//     const user = await User.findOne({ email });
-
-//     if (!user) {
-//       return res.status(404).send("User not found");
-//     }
-
-//     // Generate token
-//     const token = crypto.randomBytes(32).toString("hex");
-
-//     // Set token and expiry in DB
-//     user.resetToken = token;
-//     user.resetTokenExpiry = Date.now() + 1000 * 60 * 15; // 15 minutes
-//     await user.save();
-
-//     // Email config (example using Gmail)
-//     const transporter = nodemailer.createTransport({
-//       service: "gmail",
-//       auth: {
-//         user: process.env.EMAIL, // your email in .env
-//         pass: process.env.EMAIL_PASS,
-//       },
-//     });
-
-//     const resetLink = `http://localhost:3000/reset-password?token=${token}`;
-
-//     await transporter.sendMail({
-//       to: user.email,
-//       subject: "Reset your password",
-//       html: `<p>Click <a href="${resetLink}">here</a> to reset your password. Link valid for 15 minutes.</p>`,
-//     });
-
-//     res.send("Password reset link sent to your email.");
-//   } catch (error) {
-//     console.error("Forgot password error:", error);
-//     res.status(500).send("Internal server error");
-//   }
-// }
 async function forgotPassword(req, res) {
   const { email } = req.body;
+
   try {
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(404).send({ message: "User not found" });
     }
-    // Generate token
-    const token = crypto.randomBytes(32).toString("hex");
-    // Save token and expiry to user
-    user.resetToken = token;
-    user.resetTokenExpiry = Date.now() + 1000 * 60 * 15; // 15 min
+
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+    user.otp = otp;
+    user.otpExpiry = Date.now() + 1000 * 60 * 5;
     await user.save();
-    // Create transporter (Gmail)
+
     const transporter = nodemailer.createTransport({
       service: "gmail",
       auth: {
-        user: process.env.EMAIL,       // Your Gmail from .env
-        pass: process.env.EMAIL_PASS,  // App password
+        user: process.env.EMAIL,
+        pass: process.env.EMAIL_PASS,
       },
     });
-    // Link for frontend reset page
-    const resetLink = `http://localhost:8000/reset-password/${token}`;
-    // Send email
+
     await transporter.sendMail({
       to: user.email,
-      subject: "Password Reset Request",
-      html: `<p>You requested a password reset.</p>
-             <p>Click <a href="${resetLink}">here</a> to reset your password. Link expires in 15 minutes.</p>`,
+      subject: "Your OTP for Password Reset",
+      html: `<p>Your OTP for password reset is <b>${otp}</b>.</p>
+             <p>This OTP will expire in 5 minutes.</p>`,
     });
-    res.status(200).send({ message: "Reset link sent to your email." });
+
+    res.status(200).send({ message: "OTP sent to your email." });
   } catch (error) {
-    console.error("Forgot password error:", error);
+    console.error("Forgot password OTP error:", error);
     res.status(500).send({ message: "Internal server error" });
   }
 }
-async function resetPassword(req, res) {
-  const { token, newPassword } = req.body;
+
+
+async function verifyOtp(req, res) {
+  const { email, otp } = req.body;
 
   try {
     const user = await User.findOne({
-      resetToken: token,
-      resetTokenExpiry: { $gt: Date.now() }, // Token not expired
+      email,
+      otp,
+      otpExpiry: { $gt: Date.now() },
     });
 
     if (!user) {
-      return res.status(400).send("Invalid or expired token");
+      return res.status(400).send({ message: "Invalid or expired OTP" });
+    }
+
+    res.status(200).send({ message: "OTP verified successfully" });
+  } catch (error) {
+    console.error("OTP verification error:", error);
+    res.status(500).send({ message: "Internal server error" });
+  }
+}
+
+async function resetPassword(req, res) {
+  const { email, newPassword } = req.body;
+
+  try {
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(404).send({ message: "User not found" });
     }
 
     user.password = newPassword;
-    user.resetToken = undefined;
-    user.resetTokenExpiry = undefined;
-
+    user.otp = undefined;
+    user.otpExpiry = undefined;
     await user.save();
+
     res.send("Password updated successfully");
   } catch (error) {
     console.error("Reset password error:", error);
@@ -155,5 +132,6 @@ module.exports = {
   signup,
   login,
   forgotPassword,
-  resetPassword
+  verifyOtp, 
+  resetPassword,
 };
