@@ -1,6 +1,9 @@
 const User = require("../modals/user");
+const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const bcrypt = require('bcrypt');
 const nodemailer = require("nodemailer");
+const { LoginValidation, SignUpValidation, Auth } = require("../middleware/middleware")
 require("dotenv").config();
 
 async function signup(req, res) {
@@ -12,11 +15,16 @@ async function signup(req, res) {
     if (existingUser) {
       return res.status(400).send("User already exists!");
     }
+    const salt = await bcrypt.genSalt(10);
+    console.log('salt === ', salt);
+
+
+    const hashedPassword = await bcrypt.hash(password, salt);
 
     const newUser = await User.create({
       username,
       email,
-      password,
+      password: hashedPassword,
     });
 
     res.status(201).send("User registered successfully");
@@ -34,12 +42,25 @@ async function login(req, res) {
     if (!user) {
       return res.status(401).json({ message: "Invalid email" });
     }
+    const isMatch = await bcrypt.compare(password, user.password);
 
-    if (user.password !== password) {
+    if (!isMatch) {
       return res.status(401).json({ message: "Invalid password" });
     }
+    const token = jwt.sign(
+      { id: user._id, email: user.email },
+      process.env.JWT_SECRET || "mykey",
+      { expiresIn: "1h" }
+    );
 
-    res.json({ message: "Login successful" });
+
+    // 4. Return token to client
+    res.json({
+      message: "Login successful",
+      token: `Bearer ${token}`,
+      id: user._id,
+    });
+
   } catch (error) {
     res.status(500).json({
       message: "Login error",
@@ -132,6 +153,6 @@ module.exports = {
   signup,
   login,
   forgotPassword,
-  verifyOtp, 
+  verifyOtp,
   resetPassword,
 };

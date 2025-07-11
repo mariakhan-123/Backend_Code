@@ -1,9 +1,13 @@
-// const jwt = require("jsonwebtoken");
+const jwt = require("jsonwebtoken");
 function LoginValidation(req, res, next) {
   const email = req.body.email;
   const password = req.body.password;
-  if (!email || typeof email !== "string" || email.length < 5) {
-    return res.status(400).json({ error: "Invalid email" });
+  if (
+    !email ||
+    typeof email !== "string" ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    return res.status(400).json({ error: "Invalid email format" });
   }
   if (
     !password ||
@@ -22,9 +26,17 @@ function LoginValidation(req, res, next) {
 
 function SignUpValidation(req, res, next) {
   const username = req.body.username;
+  const email= req.body.email
   const password = req.body.password;
   if (!username || typeof username !== "string" || username.length < 5) {
     return res.status(400).json({ error: "Invalid username" });
+  }
+   if (
+    !email ||
+    typeof email !== "string" ||
+    !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+  ) {
+    return res.status(400).json({ error: "Invalid email format" });
   }
   if (
     !password ||
